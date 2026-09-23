@@ -1,0 +1,41 @@
+# Each route needs a handful of example utterances (5-10 works well).
+# The router embeds these once at startup and matches incoming queries
+# against them by cosine similarity. More/better utterances = better routing,
+# no code changes needed.
+
+routes:
+  - name: balance_query
+    handler: balance_handler
+    utterances:
+      - "What's my account balance?"
+      - "How much money do I have"
+      - "Show my current balance"
+      - "Check balance"
+      - "What's left in my account"
+
+  - name: refund_request
+    handler: refund_handler
+    utterances:
+      - "I want a refund"
+      - "Refund my order"
+      - "Cancel my payment and return the money"
+      - "I'd like my money back for this purchase"
+      - "Reverse this transaction"
+
+  - name: transaction_history
+    handler: history_handler
+    utterances:
+      - "Show my recent transactions"
+      - "List my last 10 payments"
+      - "Transaction history for this month"
+      - "What did I spend money on recently"
+      - "Show my payment history"
+
+  - name: small_talk
+    handler: small_talk_handler
+    utterances:
+      - "hello"
+      - "hi there"
+      - "how are you"
+      - "thanks"
+      - "thank you"

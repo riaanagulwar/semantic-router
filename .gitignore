@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.venv/
+venv/
+
+# sentence-transformers / HuggingFace local cache, if not baked into an
+# image or otherwise excluded from version control
+.cache/

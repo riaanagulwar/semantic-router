@@ -1,0 +1,15 @@
+# Pinned for reproducible builds — verify/bump deliberately, don't let
+# these drift silently. pip-audit (see requirements-dev.txt) runs against
+# this file in CI.
+sentence-transformers==6.1.0
+numpy==2.5.3
+pyyaml==6.0.3
+google-genai==2.12.1
+
+# HTTP API (api.py)
+fastapi==0.141.1
+uvicorn[standard]==0.30.6
+pydantic-settings==2.15.0
+prometheus-client==0.26.0
+slowapi==0.1.10
+python-json-logger==4.2.0
