@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     # gemini_client.py — the LLM fallback path.
     gemini_api_key: str | None = None
-    gemini_model_name: str = "gemini-3.8-flash"
+    gemini_model_name: str = "gemini-3.6-flash"
     max_rpm: int = 10
     max_retries: int = 2
     # Google's API rejects any deadline below 10s outright (400

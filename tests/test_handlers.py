@@ -1,13 +1,21 @@
 """
-Handler regression tests. Importing handlers.py must never crash — that's
-the whole point of the lazy GeminiFallback singleton fix — so none of
-these tests need GEMINI_API_KEY set.
+Handler regression tests. Importing handlers.py must never crash — none
+of these need GEMINI_API_KEY set, since no handler here calls Gemini
+directly (that only happens in core.handle_query, before dispatch reaches
+a handler at all — see tests/test_core.py).
 """
 
 import yaml
 
-from app.handlers import HANDLERS, balance_handler, refund_handler, history_handler, small_talk_handler
 from app.gemini_client import SAFE_FALLBACK_MESSAGE
+from app.handlers import (
+    HANDLERS,
+    balance_handler,
+    history_handler,
+    no_match_handler,
+    refund_handler,
+    small_talk_handler,
+)
 
 
 def test_every_configured_route_has_a_registered_handler():
@@ -28,10 +36,8 @@ def test_mocked_handlers_return_unchanged_strings():
     assert small_talk_handler("q") == "Hey! How can I help with your account today?"
 
 
-def test_llm_fallback_handler_fails_safe_without_api_key(monkeypatch):
-    monkeypatch.setattr("app.config.settings.settings.gemini_api_key", None)
-    import app.handlers as handlers
-
-    monkeypatch.setattr(handlers, "_gemini", None)
-    result = handlers.llm_fallback_handler("anything")
-    assert result == SAFE_FALLBACK_MESSAGE
+def test_no_match_handler_returns_the_static_message_without_any_network_call():
+    # No monkeypatching needed here at all — that's the point: this
+    # handler never touches Gemini, so it can't fail on a missing key or
+    # a network error either.
+    assert no_match_handler("anything") == SAFE_FALLBACK_MESSAGE

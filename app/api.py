@@ -1,12 +1,12 @@
 """
-HTTP API — the production entry point (`uvicorn api:app`). Wraps the same
-validate -> classify -> dispatch pipeline as main.py's CLI (both call
-core.handle_query) behind FastAPI, adding: request-ID propagation,
-structured JSON logging, Prometheus metrics, API-key auth, and per-client
-rate limiting.
+HTTP API — the production entry point (`uvicorn app.api:app`). Wraps the
+same validate -> classify -> reclassify -> dispatch pipeline as main.py's
+CLI (both call core.handle_query) behind FastAPI, adding: request-ID
+propagation, structured JSON logging, Prometheus metrics, API-key auth,
+and per-client rate limiting.
 
 Run:
-    uvicorn api:app --host 0.0.0.0 --port 8000
+    uvicorn app.api:app --host 0.0.0.0 --port 8000
 """
 
 import logging
@@ -35,8 +35,9 @@ logger = logging.getLogger("api")
 
 if not settings.gemini_api_key:
     logger.warning(
-        "GEMINI_API_KEY not set — llm_fallback route will return the safe "
-        "fallback message instead of a real answer until it's configured."
+        "GEMINI_API_KEY not set — queries the embedding router isn't "
+        "confident about will skip LLM reclassification and go straight "
+        "to the static no-match message."
     )
 if not settings.api_key:
     logger.warning("API_KEY not set — every request to POST /query will be rejected.")
@@ -105,6 +106,11 @@ class QueryResponse(BaseModel):
     runner_up_score: float
     confident: bool
     reason: str
+    # True when the embedding router wasn't confident but Gemini's
+    # classification attempt matched `route` anyway — lets a caller tell
+    # "matched outright" apart from "rescued by the LLM" for the same
+    # final route.
+    reclassified_by_llm: bool
 
 
 @app.post(
@@ -128,6 +134,7 @@ async def query(request: Request, body: QueryRequest) -> QueryResponse:
         runner_up_score=result.match.runner_up_score,
         confident=result.match.confident,
         reason=result.match.reason,
+        reclassified_by_llm=result.reclassified_by_llm,
     )
 
 

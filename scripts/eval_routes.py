@@ -4,9 +4,14 @@ prints the routing DECISION for each (score, margin, chosen route) without
 calling any handler — so you can tune SIMILARITY_THRESHOLD / AMBIGUITY_MARGIN
 in router.py and re-run this freely without spending any Gemini calls.
 
-Includes clear-cut queries for every route plus deliberately ambiguous /
-out-of-scope ones that should fall through to llm_fallback. This table is
-also the evidence you'd put in a README or talk through in an interview.
+This only exercises the embedding router in isolation (router.classify),
+not the full pipeline in core.handle_query — so "not_confident" below
+means "the embedding match alone wasn't good enough," regardless of
+whether Gemini's classification attempt would go on to rescue it into a
+real route. Includes clear-cut queries for every route plus deliberately
+ambiguous / out-of-scope ones that should fail to confidently match. This
+table is also the evidence you'd put in a README or talk through in an
+interview.
 """
 
 from app.router import SemanticRouter, validate_input
@@ -22,11 +27,13 @@ TEST_QUERIES = [
     ("hello", "small_talk"),
     ("thanks a lot", "small_talk"),
 
-    # ambiguous / out-of-scope — should fall back to the LLM
-    ("Why does my card keep getting declined", "llm_fallback"),
-    ("Can you explain how interest is calculated", "llm_fallback"),
-    ("balance transfer refund history", "llm_fallback"),  # deliberately straddles 3 routes
-    ("asdkjhasdkjh", "llm_fallback"),
+    # ambiguous / out-of-scope — the embedding router alone shouldn't be
+    # confident about any of these (Gemini may still rescue them in the
+    # full pipeline, but that's not what this script measures)
+    ("Why does my card keep getting declined", "not_confident"),
+    ("Can you explain how interest is calculated", "not_confident"),
+    ("balance transfer refund history", "not_confident"),  # deliberately straddles 3 routes
+    ("asdkjhasdkjh", "not_confident"),
 ]
 
 
@@ -41,7 +48,7 @@ def run():
     for query, expected in TEST_QUERIES:
         clean = validate_input(query)
         match = router.classify(clean)
-        got = match.route if match.confident else "llm_fallback"
+        got = match.route if match.confident else "not_confident"
         margin = match.score - match.runner_up_score
         ok = "OK" if got == expected else "MISS"
         if got == expected:

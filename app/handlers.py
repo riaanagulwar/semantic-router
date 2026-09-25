@@ -7,37 +7,20 @@ They never do getattr()/eval() on a route name or on model output, so a
 route can only ever call a function a developer explicitly registered
 here.
 
-The non-LLM handlers below are mocked (no real backend) — swap in real API
+The handlers below are all mocked (no real backend) — swap in real API
 calls when you have something to call. The point of the project is the
 routing and guardrails, not these stubs.
+
+No handler here calls Gemini. The embedding router's low-confidence case
+gets a second opinion from Gemini's intent classifier first (see
+app/core.py's handle_query) — if that succeeds, dispatch lands on one of
+the real handlers below just like a confident match would. no_match_handler
+is only reached once both the embedding router AND Gemini's classification
+attempt have failed to find a matching route, and it never touches the
+network — it's always the same static message.
 """
 
-import logging
-import threading
-
-from app.gemini_client import SAFE_FALLBACK_MESSAGE, GeminiFallback
-from app.metrics import llm_fallback_errors_total, llm_fallback_total
-
-logger = logging.getLogger("handlers")
-
-# Lazy, thread-safe singleton. GeminiFallback.__init__ raises RuntimeError
-# if GEMINI_API_KEY isn't set — instantiating it eagerly at import time (as
-# this module used to) meant `import handlers` itself crashed in any
-# environment without the key, which broke pytest collection and any
-# process (API, CLI) that imports this module before the key is available.
-# Deferring construction to first real use means import is always safe;
-# only an actual llm_fallback query touches the env var.
-_gemini: GeminiFallback | None = None
-_gemini_lock = threading.Lock()
-
-
-def _get_gemini() -> GeminiFallback:
-    global _gemini
-    if _gemini is None:
-        with _gemini_lock:
-            if _gemini is None:
-                _gemini = GeminiFallback()
-    return _gemini
+from app.gemini_client import SAFE_FALLBACK_MESSAGE
 
 
 def balance_handler(query: str) -> str:
@@ -56,29 +39,11 @@ def small_talk_handler(query: str) -> str:
     return "Hey! How can I help with your account today?"
 
 
-def llm_fallback_handler(query: str) -> str:
-    """The only handler that reaches an LLM call — used when the router
-    isn't confident a query matches a known route. Rate-limited and
-    retried inside GeminiFallback (see gemini_client.py).
-
-    If GEMINI_API_KEY isn't configured, fails safe the same way
-    GeminiFallback.answer() already does for quota/network/timeout errors
-    — return the canned safe message rather than raising into the caller.
-    """
-    llm_fallback_total.inc()
-    try:
-        answer = _get_gemini().answer(query)
-    except RuntimeError:
-        logger.error("llm_fallback unavailable: GEMINI_API_KEY not configured")
-        answer = SAFE_FALLBACK_MESSAGE
-
-    # answer() never raises — returning SAFE_FALLBACK_MESSAGE is its
-    # documented signal that the call didn't produce a real answer (rate
-    # limited, timed out, errored, or retries exhausted), so that's what
-    # the error counter tracks.
-    if answer == SAFE_FALLBACK_MESSAGE:
-        llm_fallback_errors_total.inc()
-    return answer
+def no_match_handler(query: str) -> str:
+    """Terminal fallback — reached only when neither the embedding router
+    nor Gemini's classification attempt could confidently match a known
+    route. Always the same static message; no LLM call happens here."""
+    return SAFE_FALLBACK_MESSAGE
 
 
 HANDLERS = {
@@ -86,5 +51,5 @@ HANDLERS = {
     "refund_request": refund_handler,
     "transaction_history": history_handler,
     "small_talk": small_talk_handler,
-    "llm_fallback": llm_fallback_handler,
+    "no_match": no_match_handler,
 }
